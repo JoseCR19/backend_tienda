@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+sql/
+docs/
+assets/
+ClassyShop.postman_collection.json
+
