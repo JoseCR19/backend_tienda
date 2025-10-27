@@ -1,0 +1,1135 @@
+openapi: 3.0.3
+info:
+  title: ClassyShop API
+  version: 1.0.0
+  description: >
+    API REST del backend ClassyShop para gestionar categorias, usuarios,
+    productos y ordenes.
+servers:
+  - url: http://localhost:4000
+    description: Servidor local
+  - url: https://classyshop.example.com
+    description: Servidor de produccion (ajusta segun entorno)
+tags:
+  - name: Auth
+    description: Gestion de autenticacion y emision de tokens JWT
+  - name: Orders
+    description: Operaciones sobre ordenes y su historial
+  - name: Users
+    description: Operaciones sobre clientes registrados
+  - name: Categories
+    description: Operaciones sobre categorias de productos
+  - name: Products
+    description: Operaciones sobre productos
+security:
+  - BearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Iniciar sesion
+      description: Valida credenciales de usuario y devuelve un token JWT.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+            example:
+              email: carlos@example.com
+              password: miPassword123
+      responses:
+        "200":
+          description: Inicio de sesion exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: Token JWT firmado
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Credenciales incompletas
+        "401":
+          description: Credenciales invalidas
+        "500":
+          description: Error al iniciar sesion
+  /auth/logout:
+    post:
+      security:
+        - BearerAuth: []
+      tags:
+        - Auth
+      summary: Cerrar sesion
+      description: Endpoint para que el cliente invalide el token localmente.
+      responses:
+        "204":
+          description: Sesion finalizada
+  /api/orders:
+    get:
+      tags:
+        - Orders
+      summary: Listar ordenes
+      description: Devuelve todas las ordenes ordenadas por fecha descendente.
+      responses:
+        "200":
+          description: Lista de ordenes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+        "500":
+          description: Error al obtener las ordenes
+  /api/orders/me:
+    get:
+      tags:
+        - Orders
+      summary: Listar mis compras
+      description: Devuelve las ordenes asociadas al usuario autenticado.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de compras del usuario autenticado
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+        "401":
+          description: Token de usuario requerido
+        "500":
+          description: Error al obtener tus compras
+    post:
+      tags:
+        - Orders
+      summary: Crear una orden
+      security:
+        - BearerAuth: []
+      description: >
+        Crea una orden para el usuario autenticado. El campo `userId` del payload
+        se ignora y siempre se usa el identificador asociado al token recibido.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderCreate"
+            example:
+              paymentType: card
+              total: 239.4
+              customer:
+                name: Ana Rivera
+                email: ana@example.com
+                address: Av. Los Cedros 123
+                paymentMethod: card
+              items:
+                - productId: 3
+                  title: Vestido gris
+                  sku: DR-001
+                  quantity: 1
+                  price: 149.9
+                - productId: 7
+                  title: Bolso negro
+                  sku: BG-010
+                  quantity: 1
+                  price: 89.5
+      responses:
+        "201":
+          description: Orden creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Datos invalidos
+        "409":
+          description: Usuario asociado no existe o no hay stock suficiente
+        "500":
+          description: Error al crear la orden
+  /api/orders/{id}:
+    get:
+      tags:
+        - Orders
+      summary: Obtener una orden por ID
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Orden encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: ID de orden invalido
+        "404":
+          description: Orden no encontrada
+        "500":
+          description: Error al obtener la orden
+    put:
+      tags:
+        - Orders
+      summary: Actualizar parcialmente una orden
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderUpdate"
+            example:
+              paymentType: pagoefectivo
+              customer:
+                name: Ana Rivera
+                email: ana@example.com
+                address: Av. Los Cedros 123
+                paymentMethod: pagoefectivo
+                pagoBranch: agente_pe
+              items:
+                - productId: 3
+                  title: Vestido gris
+                  sku: DR-001
+                  quantity: 1
+                  price: 149.9
+                - productId: 7
+                  title: Bolso negro
+                  sku: BG-010
+                  quantity: 2
+                  price: 89.5
+              total: 328.9
+      responses:
+        "200":
+          description: Orden actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Solicitud invalida
+        "404":
+          description: Orden no encontrada
+        "409":
+          description: Usuario asociado no existe
+        "500":
+          description: Error al actualizar la orden
+    delete:
+      tags:
+        - Orders
+      summary: Eliminar una orden
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "204":
+          description: Orden eliminada
+        "400":
+          description: ID de orden invalido
+        "404":
+          description: Orden no encontrada
+        "500":
+          description: Error al eliminar la orden
+  /api/users/{userId}/orders:
+    get:
+      tags:
+        - Orders
+      summary: Listar ordenes por usuario
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Lista de ordenes del usuario
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+        "400":
+          description: ID de usuario invalido
+        "500":
+          description: Error al obtener las ordenes del usuario
+      security:
+        - BearerAuth: []
+        - AdminToken: []
+  /api/users:
+    get:
+      tags:
+        - Users
+      summary: Listar usuarios
+      responses:
+        "200":
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "500":
+          description: Error al obtener los usuarios
+      security:
+        - AdminToken: []
+    post:
+      tags:
+        - Users
+      summary: Crear un usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+            example:
+              name: Carlos
+              lastname: Lopez
+              email: carlos@example.com
+              cellphone: "999888777"
+              password: miPassword123
+              terms: true
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Datos invalidos
+        "409":
+          description: Email duplicado
+        "500":
+          description: Error al crear el usuario
+      security: []
+  /api/users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Obtener usuario por ID
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Usuario encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: ID de usuario invalido
+        "404":
+          description: Usuario no encontrado
+        "500":
+          description: Error al obtener el usuario
+      security:
+        - BearerAuth: []
+        - AdminToken: []
+    put:
+      tags:
+        - Users
+      summary: Actualizar usuario
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+            example:
+              name: Carlos Alberto
+              lastname: Lopez Diaz
+              cellphone: "900111222"
+              terms: false
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Solicitud invalida
+        "404":
+          description: Usuario no encontrado
+        "409":
+          description: Email duplicado
+        "500":
+          description: Error al actualizar el usuario
+      security:
+        - BearerAuth: []
+        - AdminToken: []
+    delete:
+      tags:
+        - Users
+      summary: Eliminar usuario
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "204":
+          description: Usuario eliminado
+        "400":
+          description: ID de usuario invalido
+        "404":
+          description: Usuario no encontrado
+        "409":
+          description: Usuario con ordenes asociadas
+        "500":
+          description: Error al eliminar el usuario
+      security:
+        - AdminToken: []
+  /api/categories:
+    get:
+      tags:
+        - Categories
+      summary: Listar categorias
+      security:
+        - AdminToken: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+        "500":
+          description: Error al obtener las categorias
+    post:
+      tags:
+        - Categories
+      summary: Crear categoria
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryCreate"
+            example:
+              name: Vestidos
+      responses:
+        "201":
+          description: Categoria creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: Datos invalidos
+        "409":
+          description: Nombre duplicado
+        "500":
+          description: Error al crear la categoria
+  /api/categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: Obtener categoria por ID
+      security:
+        - AdminToken: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryId"
+      responses:
+        "200":
+          description: Categoria encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: ID de categoria invalido
+        "404":
+          description: Categoria no encontrada
+        "500":
+          description: Error al obtener la categoria
+    put:
+      tags:
+        - Categories
+      summary: Actualizar categoria
+      security:
+        - AdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryUpdate"
+            example:
+              name: Ofertas Especiales
+      responses:
+        "200":
+          description: Categoria actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          description: Datos invalidos
+        "404":
+          description: Categoria no encontrada
+        "409":
+          description: Nombre duplicado
+        "500":
+          description: Error al actualizar la categoria
+    delete:
+      tags:
+        - Categories
+      summary: Eliminar categoria
+      security:
+        - AdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryId"
+      responses:
+        "204":
+          description: Categoria eliminada
+        "400":
+          description: ID de categoria invalido
+        "404":
+          description: Categoria no encontrada
+        "409":
+          description: Categoria con productos asociados
+        "500":
+          description: Error al eliminar la categoria
+  /api/categories/{id}/products:
+    get:
+      tags:
+        - Categories
+        - Products
+      summary: Listar productos por categoria
+      description: Devuelve los productos asociados a la categoria indicada.
+      security:
+        - AdminToken: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CategoryId"
+      responses:
+        "200":
+          description: Lista de productos de la categoria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "400":
+          description: ID de categoria invalido
+        "500":
+          description: Error al obtener los productos por categoria
+  /api/products:
+    get:
+      tags:
+        - Products
+      summary: Listar productos
+      security:
+        - AdminToken: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de productos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "500":
+          description: Error al obtener los productos
+    post:
+      tags:
+        - Products
+      summary: Crear producto
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreate"
+            example:
+              name: "Bolso Tote Turquesa City"
+              slug: "bolso-tote-turquesa-city"
+              brand: "City Chic"
+              description: "Bolso tote en ecocuero turquesa con herrajes metalicos."
+              picture: "https://example.com/images/bolso-turquesa.jpg"
+              price: 319
+              money: PEN
+              stock: 32
+              new: false
+              badge: { label: "Mas comprado", tone: "primary" }
+              segments: ["best-sellers", "moda"]
+              features: ["Forro resistente", "Bolsillo con cierre"]
+              related_ids: [2,7,12]
+              id_category: 2
+      responses:
+        "201":
+          description: Producto creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Datos invalidos
+        "409":
+          description: Producto duplicado o categoria inexistente
+        "500":
+          description: Error al crear el producto
+  /api/products/best-sellers:
+    get:
+      tags:
+        - Products
+      summary: Top 3 productos mas vendidos
+      description: Devuelve hasta tres productos marcados como "Mas comprado" o con el segmento "best-sellers".
+      security:
+        - AdminToken: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de productos destacados por ventas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "500":
+          description: Error al obtener los productos mas vendidos
+  /api/products/new-arrivals:
+    get:
+      tags:
+        - Products
+      summary: Top 4 productos nuevos
+      description: Devuelve hasta cuatro productos marcados como nuevos (`new = true`) o con el segmento "new-arrivals".
+      security:
+        - AdminToken: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de productos recientemente añadidos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "500":
+          description: Error al obtener los productos nuevos
+  /api/products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Obtener producto por ID
+      security:
+        - AdminToken: []
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: ID de producto invalido
+        "404":
+          description: Producto no encontrado
+        "500":
+          description: Error al obtener el producto
+    put:
+      tags:
+        - Products
+      summary: Actualizar producto
+      security:
+        - AdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+            example:
+              slug: "bolso-tote-turquesa-city-v2"
+              price: 329
+              stock: 28
+              isNew: false
+              badge: { label: "Destacado", tone: "info" }
+              segments: ["moda", "seleccion-destacada"]
+              relatedIds: [1,3]
+              categoryId: 2
+      responses:
+        "200":
+          description: Producto actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Solicitud invalida
+        "404":
+          description: Producto no encontrado
+        "409":
+          description: Producto duplicado o categoria inexistente
+        "500":
+          description: Error al actualizar el producto
+    delete:
+      tags:
+        - Products
+      summary: Eliminar producto
+      security:
+        - AdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "204":
+          description: Producto eliminado
+        "400":
+          description: ID de producto invalido
+        "404":
+          description: Producto no encontrado
+        "500":
+          description: Error al eliminar el producto
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      description: Identificador de la orden
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    UserId:
+      name: id
+      in: path
+      description: Identificador del usuario
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    CategoryId:
+      name: id
+      in: path
+      description: Identificador de la categoria
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    ProductId:
+      name: id
+      in: path
+      description: Identificador del producto
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  schemas:
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        first_product_image:
+          type: string
+          nullable: true
+          description: URL de la imagen del primer producto asociado a la categoria; null si no existen productos
+      required:
+        - id
+        - name
+    CategoryCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+    CategoryUpdate:
+      allOf:
+        - $ref: "#/components/schemas/CategoryCreate"
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        lastname:
+          type: string
+        email:
+          type: string
+          format: email
+        cellphone:
+          type: string
+          nullable: true
+        terms:
+          type: boolean
+      required:
+        - id
+        - name
+        - lastname
+        - email
+        - terms
+    UserCreate:
+      type: object
+      required:
+        - name
+        - lastname
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        lastname:
+          type: string
+        email:
+          type: string
+          format: email
+        cellphone:
+          type: string
+          nullable: true
+        password:
+          type: string
+          description: Contrasena en texto plano; el servidor la cifra con bcrypt antes de
+            almacenarla
+        terms:
+          type: boolean
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        lastname:
+          type: string
+        email:
+          type: string
+          format: email
+        cellphone:
+          type: string
+          nullable: true
+        password:
+          type: string
+          description: Contrasena en texto plano; el servidor la cifra con bcrypt antes de
+            almacenarla
+        terms:
+          type: boolean
+    Product:
+      type: object
+      properties:
+        slug:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+        brand:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        picture:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: float
+        money:
+          type: string
+        stock:
+          type: integer
+        new:
+          type: boolean
+        badge:
+          type: object
+          additionalProperties: true
+          nullable: false
+          description: Objeto JSON libre para rotulos/etiquetas (JSONB)
+        segments:
+          type: array
+          items:
+            type: string
+        features:
+          type: array
+          items:
+            type: string
+        related_ids:
+          type: array
+          items:
+            type: integer
+        id_category:
+          type: integer
+        category:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+      required:
+        - slug
+        - id
+        - name
+        - price
+        - money
+        - stock
+        - new
+        - id_category
+    ProductCreate:
+      type: object
+      required:
+        - name
+        - price
+        - id_category
+      properties:
+        name:
+          type: string
+          description: Puede usarse 'title' como alias
+        title:
+          type: string
+          description: Alias aceptado del servidor; se mapea a 'name'
+        slug:
+          type: string
+          description: Si se omite, el servidor lo deriva del nombre
+        price:
+          type: number
+          format: float
+        money:
+          type: string
+          default: PEN
+        stock:
+          type: integer
+          default: 0
+        new:
+          type: boolean
+          default: true
+        isNew:
+          type: boolean
+          description: Alias aceptado del servidor; se mapea a 'new'
+        brand:
+          type: string
+        description:
+          type: string
+        picture:
+          type: string
+        badge:
+          type: object
+          additionalProperties: true
+        segments:
+          type: array
+          items:
+            type: string
+        features:
+          type: array
+          items:
+            type: string
+        related_ids:
+          type: array
+          items:
+            type: integer
+        id_category:
+          type: integer
+        categoryId:
+          type: integer
+          description: Alias aceptado del servidor; se mapea a 'id_category'
+    ProductUpdate:
+      type: object
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        title:
+          type: string
+          description: Alias aceptado; se mapea a 'name'
+        price:
+          type: number
+          format: float
+        money:
+          type: string
+        stock:
+          type: integer
+        new:
+          type: boolean
+        isNew:
+          type: boolean
+        brand:
+          type: string
+        description:
+          type: string
+        picture:
+          type: string
+        badge:
+          type: object
+          additionalProperties: true
+        segments:
+          type: array
+          items:
+            type: string
+        features:
+          type: array
+          items:
+            type: string
+        related_ids:
+          type: array
+          items:
+            type: integer
+        id_category:
+          type: integer
+        categoryId:
+          type: integer
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: integer
+          description: Identificador del producto en el catalogo
+        title:
+          type: string
+        sku:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: number
+      required:
+        - productId
+        - title
+        - quantity
+        - price
+    CustomerDetails:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        address:
+          type: string
+        paymentMethod:
+          type: string
+        yapePhone:
+          type: string
+        pagoBranch:
+          type: string
+        pagoCode:
+          type: string
+      required:
+        - name
+        - email
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        id_user:
+          type: integer
+        order_date:
+          type: string
+          format: date-time
+        customer_details:
+          $ref: "#/components/schemas/CustomerDetails"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        total:
+          type: number
+        type_payment:
+          type: string
+        user:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            lastname:
+              type: string
+            email:
+              type: string
+      required:
+        - id
+        - id_user
+        - order_date
+        - items
+        - total
+        - type_payment
+    OrderCreate:
+      type: object
+      required:
+        - paymentType
+        - total
+        - customer
+        - items
+      properties:
+        userId:
+          type: integer
+          description: |
+            Opcional. Si se omite, se usa el usuario autenticado. Requerido solo
+            cuando se crea la orden con el token de administrador para otro usuario.
+        paymentType:
+          type: string
+        total:
+          type: number
+        customer:
+          $ref: "#/components/schemas/CustomerDetails"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+    OrderUpdate:
+      type: object
+      properties:
+        userId:
+          type: integer
+        paymentType:
+          type: string
+        total:
+          type: number
+        customer:
+          $ref: "#/components/schemas/CustomerDetails"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
