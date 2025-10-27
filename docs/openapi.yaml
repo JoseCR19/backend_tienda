@@ -6,7 +6,7 @@ info:
     API REST del backend ClassyShop para gestionar categorias, usuarios,
     productos y ordenes.
 servers:
-  - url: http://localhost:4000
+  - url: https://backendtienda-production-91a2.up.railway.app
     description: Servidor local
   - url: https://classyshop.example.com
     description: Servidor de produccion (ajusta segun entorno)
